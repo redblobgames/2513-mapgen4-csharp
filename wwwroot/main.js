@@ -6,6 +6,7 @@ setModuleImports('main.js', {
     canvas: {
         drawPoints,
         drawLineSegments,
+        drawPolygon,
     },
 });
 
@@ -39,6 +40,18 @@ function drawLineSegments(color, lineWidth, coordinates) {
         ctx.lineTo(coordinates[i+2], coordinates[i+3]);
         ctx.stroke();
     }
+}
+
+/** @type{number[]} coordinates - flattened x,y coordinates */
+function drawPolygon(color, coordinates) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    for (let i = 0; i < coordinates.length; i += 2) {
+        let [x, y] = coordinates.slice(i, i+2);
+        if (i === 0) ctx.moveTo(x, y);
+        else         ctx.lineTo(x, y);
+    }
+    ctx.fill();
 }
 
 const config = getConfig();

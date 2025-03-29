@@ -25,6 +25,12 @@ partial class Mapgen4
         [JSMarshalAs<JSType.Array<JSType.Number>>] double[] coordinates
         );
 
+    [JSImport("canvas.drawPolygon", "main.js")]
+    internal static partial void DrawPolygon(
+        string color,
+        [JSMarshalAs<JSType.Array<JSType.Number>>] double[] coordinates
+        );
+
     [JSExport]
     internal static void RunDualMesh()
     {
@@ -51,6 +57,24 @@ partial class Mapgen4
         var init = new MeshInitializer{ Points = points, Triangles = _delaunator.Triangles, Halfedges = _delaunator.Halfedges, NumBoundaryPoints = numBoundaryPoints };
         init = TriangleMesh.AddGhostStructure(init);
         var mesh = new TriangleMesh(init);
+
+        /*
+        // Draw triangles
+        for (int t = 0; t < mesh.NumSolidTriangles; t++)
+        {
+            int[] r_out = mesh.R_Around_T(t);
+            DrawPolygon("oklch(90% 0.03 " + random.Next(360) + "deg)",
+                        r_out.SelectMany(r => new[] { mesh.X_Of_R(r), mesh.Y_Of_R(r) }).ToArray());
+        }
+        */
+
+        // Draw regions
+        for (int r = 0; r < mesh.NumSolidRegions; r++)
+        {
+            List<int> t_out = mesh.T_Around_R(r);
+            DrawPolygon("oklch(90% 0.03 " + random.Next(360) + "deg)",
+                        t_out.SelectMany(t => new[] { mesh.X_Of_T(t), mesh.Y_Of_T(t) }).ToArray());
+        }
 
         var coordinates = new double[4 * mesh.NumSolidSides];
         for (int s = 0; s < mesh.NumSolidSides; s++)
