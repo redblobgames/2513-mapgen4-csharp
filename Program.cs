@@ -11,18 +11,20 @@ partial class Mapgen4
 {
     private static Delaunator _delaunator;
 
-    [JSImport("canvas.drawPoints", "main.js")]
-    internal static partial void DrawPoints(
+    [JSImport("canvas.drawPoint", "main.js")]
+    internal static partial void DrawPoint(
         string color, double radius,
-        [JSMarshalAs<JSType.Array<JSType.Number>>] double[] coordinates
-        );
+        double x, double y
+    );
 
-    [JSImport("canvas.drawLineSegments", "main.js")]
-    internal static partial void DrawLineSegments(
+    [JSImport("canvas.drawLineSegment", "main.js")]
+    internal static partial void DrawLineSegment(
         string color, double lineWidth,
-        [JSMarshalAs<JSType.Array<JSType.Number>>] double[] coordinates
-        );
+        double x1, double y1, double x2, double y2
+    );
 
+    // NOTE: not obvious how to pass List<Point> so I'm flattening
+    // on the C# side to List<double> and passing it as double[]
     [JSImport("canvas.drawPolygon", "main.js")]
     internal static partial void DrawPolygon(
         string color,
@@ -34,7 +36,14 @@ partial class Mapgen4
     {
         var bounds = new Bounds { Left = 50, Top = 50, Width = 900, Height = 900 };
         var spacing = 50;
+        // The interior boundary points are inside the 'bounds' rectangle; the exterior
+        // boundary points are outside, and can be clipped later. The exterior points
+        // are needed to complete the polygons at the edge of the map. See
+        // <https://www.redblobgames.com/x/2312-dual-mesh/#boundary> for motivation.
+        // When using a Poisson Disc library, the interior boundary points should be part
+        // of the poisson disc set, and the exterior boundary points should be added later.
         var points = MeshCreator.GenerateInteriorBoundaryPoints(bounds, spacing);
+        points.AddRange(MeshCreator.GenerateExteriorBoundaryPoints(bounds, spacing));
         var numBoundaryPoints = points.Count;
 
         // DualMeshTests.AddRandomPoints(points, (int)Math.Round((bounds.Width * bounds.Height) / (spacing * spacing)), bounds);
@@ -66,51 +75,50 @@ partial class Mapgen4
         }
         */
 
-        // Draw regions
+        // Draw polygon regions
         for (int r = 0; r < mesh.NumSolidRegions; r++)
         {
             List<int> t_out = mesh.T_Around_R(r);
             DrawPolygon("oklch(90% 0.03 " + random.Next(360) + "deg)",
-                        t_out.SelectMany(t => new[] { mesh.X_Of_T(t), mesh.Y_Of_T(t) }).ToArray());
+                        t_out
+                        .SelectMany(t => new[] { mesh.X_Of_T(t), mesh.Y_Of_T(t) })
+                        .ToArray());
         }
 
-        var coordinates = new double[4 * mesh.NumSolidSides];
+        // Draw the black edges making the triangles
         for (int s = 0; s < mesh.NumSolidSides; s++)
         {
             int r1 = mesh.R_Begin_S(s);
             int r2 = mesh.R_End_S(s);
-            coordinates[4*s] = mesh.X_Of_R(r1);
-            coordinates[4*s+1] = mesh.Y_Of_R(r1);
-            coordinates[4*s+2] = mesh.X_Of_R(r2);
-            coordinates[4*s+3] = mesh.Y_Of_R(r2);
+            DrawLineSegment(
+                "black", 0.75,
+                mesh.X_Of_R(r1), mesh.Y_Of_R(r1),
+                mesh.X_Of_R(r2), mesh.Y_Of_R(r2)
+            );
         }
-        DrawLineSegments("black", 0.75, coordinates);
 
+        // Draw the white edges making the polygon regions
         for (int s = 0; s < mesh.NumSolidSides; s++)
         {
             int t1 = mesh.T_Inner_S(s);
             int t2 = mesh.T_Outer_S(s);
-            coordinates[4*s] = mesh.X_Of_T(t1);
-            coordinates[4*s+1] = mesh.Y_Of_T(t1);
-            coordinates[4*s+2] = mesh.X_Of_T(t2);
-            coordinates[4*s+3] = mesh.Y_Of_T(t2);
+            DrawLineSegment(
+                "white", 1.5,
+                mesh.X_Of_T(t1), mesh.Y_Of_T(t1),
+                mesh.X_Of_T(t2), mesh.Y_Of_T(t2)
+            );
         }
-        DrawLineSegments("white", 1.5, coordinates);
 
-        coordinates = new double[2 * mesh.NumSolidTriangles];
+        // Draw the blue points which represent triangle centers / region vertices
         for (int t = 0; t < mesh.NumSolidTriangles; t++)
         {
-            coordinates[2*t] = mesh.X_Of_T(t);
-            coordinates[2*t+1] = mesh.Y_Of_T(t);
+            DrawPoint("hsl(240 50% 50%)", 3, mesh.X_Of_T(t), mesh.Y_Of_T(t));
         }
-        DrawPoints("hsl(240 50% 50%)", 3, coordinates);
-        
-        coordinates = new double[2 * mesh.NumSolidRegions];
+
+        // Draw the red points which represent region centers / triangle vertices
         for (int r = 0; r < mesh.NumSolidRegions; r++)
         {
-            coordinates[2*r] = mesh.X_Of_R(r);
-            coordinates[2*r+1] = mesh.Y_Of_R(r);
+            DrawPoint("hsl(0 50% 50%)", 4, mesh.X_Of_R(r), mesh.Y_Of_R(r));
         }
-        DrawPoints("hsl(0 50% 50%)", 4, coordinates);
     }
 }
