@@ -10,7 +10,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Text.Json;
 using DelaunatorSharp;
 
 public class DualMeshTests
@@ -191,7 +190,7 @@ public class DualMeshTests
             int e2 = delaunator.Halfedges[e1];
             if (e2 != -1 && delaunator.Halfedges[e2] != e1)
             {
-                Test.Fail($"invalid halfedge connection; data set was {JsonSerializer.Serialize(points)}");
+                Test.Fail("invalid halfedge connection");
                 return;
             }
         }
