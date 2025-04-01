@@ -35,7 +35,7 @@ partial class Mapgen4
     [JSExport]
     internal static void RunDualMesh()
     {
-        var bounds = new Bounds { Left = 50, Top = 50, Width = 900, Height = 900 };
+        var bounds = new Bounds { Left = 0, Top = 0, Width = 1000, Height = 1000 };
         var spacing = 7;
         // The interior boundary points are inside the 'bounds' rectangle; the exterior
         // boundary points are outside, and can be clipped later. The exterior points
@@ -74,7 +74,7 @@ partial class Mapgen4
         map.AssignRainfall();
         map.AssignRivers();
 
-        DrawDualMeshTestCard(mesh);
+        // DrawDualMeshTestCard(mesh);
         DrawMap(map);
     }
 
@@ -144,8 +144,27 @@ partial class Mapgen4
         // Draw polygon regions
         for (int r = 0; r < map.Mesh.NumSolidRegions; r++)
         {
+            float e = map.Elevation_R[r];
+            string color = "red";
+            // coloring adapted from https://www.redblobgames.com/maps/terrain-from-noise/
+            if (e < 0.0) { // water
+                color = $"rgb({(int)(48 + 48*e)} {(int)(64 + 64*e)} {(int)(127 + 128*e)})";
+            } else { // land
+                float m = map.Rainfall_R[r];
+                // Green or brown at low elevation, and make it more white-ish
+                // as you get colder
+                m = m * (1-e); // higher elevation holds less moisture
+                m = float.Sqrt(m);
+                float red = 210 - 100*m;
+                float green = 185 - 45*m;
+                float blue = 139 - 45*m;
+                red = 255 * e + red * (1-e);
+                green = 255 * e + green * (1-e);
+                blue = 255 * e + blue * (1-e);
+                color = $"rgb({(int)red} {(int)green} {(int)blue})";
+            }
+
             List<int> t_out = map.Mesh.T_Around_R(r);
-            string color = map.Elevation_R[r] < 0.0 ? "#225588" : "#889977";
             DrawPolygon(color,
                         t_out
                         .SelectMany(t => new[] { map.Mesh.X_Of_T(t), map.Mesh.Y_Of_T(t) })
@@ -159,6 +178,8 @@ partial class Mapgen4
         {
             int t1 = map.Mesh.T_Inner_S(s);
             int t2 = map.Mesh.T_Outer_S(s);
+            if (map.Elevation_T[t1] < 0.0) continue; // ocean
+            if (map.Elevation_T[t2] < 0.0) continue; // ocean
             if (map.Flow_S[s] < MIN_FLOW) continue;
             double width = 2.0 * double.Sqrt(map.Flow_S[s] - MIN_FLOW) * map.Spacing / 2 * RIVER_WIDTH;
             if (width < 0) continue;
@@ -179,7 +200,7 @@ partial class Mapgen4
             int t1 = map.Mesh.T_Inner_S(s);
             int t2 = map.Mesh.T_Outer_S(s);
             DrawLineSegment(
-                "black", 3.0,
+                "black", 2.0,
                 map.Mesh.X_Of_T(t1), map.Mesh.Y_Of_T(t1),
                 map.Mesh.X_Of_T(t2), map.Mesh.Y_Of_T(t2)
             );

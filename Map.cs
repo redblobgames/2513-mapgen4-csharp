@@ -44,7 +44,7 @@ class Map
     {
         Mesh = mesh;
         Spacing = spacing;
-        Seed = 12345;
+        Seed = 287;
         Noise.Seed = Seed;
         WindAngleDegrees = 0;
 
@@ -61,6 +61,7 @@ class Map
         CalculateWindOrder();
     }
 
+    // Wrapper around the SimplexNoise library
     public float Noise2D(double x, double y)
     {
         // The SimplexNoise library API uses integers and internally
@@ -69,6 +70,7 @@ class Map
         // values by 1000 and then divide by 1000 in the library's
         // scale parameter.
         const float scale = 1000.0f;
+        x += 1.0; y += 1.0; // hack: because this library seems to have some weird output near 0
         float n = Noise.CalcPixel2D((int)(x*scale), (int)(y*scale), 1.0f/scale);
         // The SimplexNoise library API converts its -1.0 to +1.0
         // float into a value 0 to 255. I want to convert it back
