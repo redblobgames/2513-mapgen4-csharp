@@ -9,7 +9,8 @@ DualMeshTests.RunTests();
 
 partial class Mapgen4
 {
-    private static Delaunator _delaunator;
+    const double PARAM_lg_min_flow = 0.1; // 2.7;
+    const double PARAM_lg_river_width = -2.7;
 
     [JSImport("canvas.drawPoint", "main.js")]
     internal static partial void DrawPoint(
@@ -60,10 +61,22 @@ partial class Mapgen4
             }
         }
 
-        _delaunator = new Delaunator([.. points]);
-        var init = new MeshInitializer{ Points = points, Triangles = _delaunator.Triangles, Halfedges = _delaunator.Halfedges, NumBoundaryPoints = numBoundaryPoints };
+        Delaunator delaunator = new Delaunator([.. points]);
+        var init = new MeshInitializer{ Points = points, Triangles = delaunator.Triangles, Halfedges = delaunator.Halfedges, NumBoundaryPoints = numBoundaryPoints };
         init = TriangleMesh.AddGhostStructure(init);
         var mesh = new TriangleMesh(init);
+        var map = new Map(mesh, spacing);
+        map.AssignElevation();
+        map.AssignRainfall();
+        map.AssignRivers();
+
+        DrawDualMeshTestCard(mesh);
+        DrawMap(map);
+    }
+
+    static void DrawDualMeshTestCard(TriangleMesh mesh)
+    {
+        var random = new Random();
 
         /*
         // Draw triangles
@@ -121,4 +134,52 @@ partial class Mapgen4
             DrawPoint("hsl(0 50% 50%)", 4, mesh.X_Of_R(r), mesh.Y_Of_R(r));
         }
     }
+
+    static void DrawMap(Map map)
+    {
+        // Draw polygon regions
+        for (int r = 0; r < map.Mesh.NumSolidRegions; r++)
+        {
+            List<int> t_out = map.Mesh.T_Around_R(r);
+            string color = map.Elevation_R[r] < 0.0 ? "#225588" : "#889977";
+            DrawPolygon(color,
+                        t_out
+                        .SelectMany(t => new[] { map.Mesh.X_Of_T(t), map.Mesh.Y_Of_T(t) })
+                        .ToArray());
+        }
+
+        // Draw rivers
+        double MIN_FLOW = double.Exp(PARAM_lg_min_flow);
+        double RIVER_WIDTH = double.Exp(PARAM_lg_river_width);
+        for (int s = 0; s < map.Mesh.NumSolidSides; s++)
+        {
+            int t1 = map.Mesh.T_Inner_S(s);
+            int t2 = map.Mesh.T_Outer_S(s);
+            if (map.Flow_S[s] < MIN_FLOW) continue;
+            double width = 2.0 * double.Sqrt(map.Flow_S[s] - MIN_FLOW) * map.Spacing / 2 * RIVER_WIDTH;
+            if (width < 0) continue;
+            DrawLineSegment(
+                "#225588", width,
+                map.Mesh.X_Of_T(t1), map.Mesh.Y_Of_T(t1),
+                map.Mesh.X_Of_T(t2), map.Mesh.Y_Of_T(t2)
+            );
+        }
+
+        // Draw coastlines - black edge if one side is water and the other is not
+        for (int s = 0; s < map.Mesh.NumSolidSides; s++)
+        {
+            int r1 = map.Mesh.R_Begin_S(s);
+            int r2 = map.Mesh.R_End_S(s);
+            if ((map.Elevation_R[r1] < 0.0) == (map.Elevation_R[r2] < 0.0)) continue;
+
+            int t1 = map.Mesh.T_Inner_S(s);
+            int t2 = map.Mesh.T_Outer_S(s);
+            DrawLineSegment(
+                "black", 3.0,
+                map.Mesh.X_Of_T(t1), map.Mesh.Y_Of_T(t1),
+                map.Mesh.X_Of_T(t2), map.Mesh.Y_Of_T(t2)
+            );
+        }
+    }
+    
 }

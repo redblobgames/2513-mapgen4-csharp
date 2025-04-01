@@ -5,5 +5,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Delaunator" Version="1.0.11" />
+    <PackageReference Include="SimplexNoise" Version="2.0.0" />
   </ItemGroup>
 </Project>
