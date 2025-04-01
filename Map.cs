@@ -11,6 +11,7 @@
 
 using System;
 using System.Collections.Generic;
+using SimplexNoise;
 
 class Map
 {
@@ -20,6 +21,7 @@ class Map
     const double PARAM_Evaporation = 0.5;
     const double PARAM_RainShadow = 0.5;
     const double PARAM_Flow = 0.2;
+    const double PARAM_island = 0.5;
 
     public int Seed;
     public TriangleMesh Mesh;
@@ -43,6 +45,7 @@ class Map
         Mesh = mesh;
         Spacing = spacing;
         Seed = 12345;
+        Noise.Seed = Seed;
         WindAngleDegrees = 0;
 
         Elevation_T   = new float[mesh.NumTriangles];
@@ -56,6 +59,21 @@ class Map
         Flow_S        = new float[mesh.NumSides];
 
         CalculateWindOrder();
+    }
+
+    public float Noise2D(double x, double y)
+    {
+        // The SimplexNoise library API uses integers and internally
+        // converts to floats, but we want to access the floats
+        // directly, so this is a workaround -- multiply all the
+        // values by 1000 and then divide by 1000 in the library's
+        // scale parameter.
+        const float scale = 1000.0f;
+        float n = Noise.CalcPixel2D((int)(x*scale), (int)(y*scale), 1.0f/scale);
+        // The SimplexNoise library API converts its -1.0 to +1.0
+        // float into a value 0 to 255. I want to convert it back
+        // to -1.0 to +1.0.
+        return (n - 128.0f) / 128.0f;
     }
 
     public void AssignElevation()
@@ -75,8 +93,47 @@ class Map
     /// this will be mixed in with other noise. x,y are from 0.0 to 1.0.
     private double DesiredElevationAt(double x, double y)
     {
-        // TODO: fbm noise with two or three low frequency octaves
-        return x - 0.5;
+        // Until we have user-painting, use a default island shape
+
+        // x,y are 0.0 to 1.0 but nx,ny are -1.0 to +1.0, where 0.0 is
+        // the center of the map
+        double nx = (x - 0.5) * 2.0;
+        double ny = (y - 0.5) * 2.0;
+
+        // First phase: set e to *fbm noise*, following
+        // https://www.redblobgames.com/maps/terrain-from-noise/
+        const int octaves = 5;
+        double e = 0.0;
+        double sumOfAmplitudes = 0.0;
+        for (int octave = 0; octave < octaves; octave++)
+        {
+            float frequency = 1 << octave;
+            double amplitude = double.Pow(0.5, octave);
+            e += amplitude * Noise2D(nx*frequency, ny*frequency);
+            sumOfAmplitudes += amplitude;
+        }
+        e /= sumOfAmplitudes;
+
+        // Second phase: reshape to make it an island
+        // https://www.redblobgames.com/maps/terrain-from-noise/#islands
+        double distance = double.Max(double.Abs(nx), double.Abs(ny));
+        e = 0.5 * (e + PARAM_island * (0.75 - 2 * distance * distance));
+
+        // Clamp
+        if (e < -1.0) { e = -1.0; }
+        if (e > +1.0) { e = +1.0; }
+
+        // Tweak
+        if (e > 0.0) {
+            double m = (0.5 * Noise2D(nx + 30, ny + 50)
+                     + 0.5 * Noise2D(2*nx + 33, 2*ny + 55));
+            // TODO: make some of these into parameters
+            double mountain = double.Min(1.0, e * 5.0) * (1 - double.Abs(m) / 0.5);
+            if (mountain > 0.0) {
+                e = double.Max(e, double.Min(e * 3, mountain));
+            }
+        }
+        return e;
         // In the original code I sampled from a low resolution bitmap
         // using bilinear interpolation to smooth things out
     }

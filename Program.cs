@@ -36,7 +36,7 @@ partial class Mapgen4
     internal static void RunDualMesh()
     {
         var bounds = new Bounds { Left = 50, Top = 50, Width = 900, Height = 900 };
-        var spacing = 50;
+        var spacing = 7;
         // The interior boundary points are inside the 'bounds' rectangle; the exterior
         // boundary points are outside, and can be clipped later. The exterior points
         // are needed to complete the polygons at the edge of the map. See
@@ -65,6 +65,10 @@ partial class Mapgen4
         var init = new MeshInitializer{ Points = points, Triangles = delaunator.Triangles, Halfedges = delaunator.Halfedges, NumBoundaryPoints = numBoundaryPoints };
         init = TriangleMesh.AddGhostStructure(init);
         var mesh = new TriangleMesh(init);
+
+        Console.WriteLine("{0} regions, {1} sides, {2} triangles",
+                          mesh.NumRegions, mesh.NumSides, mesh.NumTriangles);
+        
         var map = new Map(mesh, spacing);
         map.AssignElevation();
         map.AssignRainfall();
